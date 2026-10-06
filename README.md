@@ -6,7 +6,7 @@ A browser-first workspace for verifying tender documents and generating one subm
 
 **Participant:** Taskin Billah Tamim  
 **Registration number:** See contest portal  
-**Live URL:** https://taskintamim.github.io/devfest-Taskin-Billah-Tamim-/  
+**Live URL:** https://devfest-taskin-billah-tamim.vercel.app/  
 **GitHub:** https://github.com/Taskintamim/devfest-Taskin-Billah-Tamim-
 
 The product follows one journey:
