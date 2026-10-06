@@ -68,6 +68,7 @@ function wrapText(text, font, size, maxWidth) {
 
 function drawFooter(page, font, tenderId, pageNumber, totalPages) {
   const { width } = page.getSize();
+  const inset = Math.min(MARGIN, Math.max(18, width * 0.06));
   page.drawRectangle({
     x: 0,
     y: 0,
@@ -76,8 +77,8 @@ function drawFooter(page, font, tenderId, pageNumber, totalPages) {
     color: WHITE,
   });
   page.drawLine({
-    start: { x: MARGIN, y: FOOTER_H },
-    end: { x: width - MARGIN, y: FOOTER_H },
+    start: { x: inset, y: FOOTER_H },
+    end: { x: width - inset, y: FOOTER_H },
     thickness: 0.6,
     color: LINE,
   });
@@ -85,7 +86,7 @@ function drawFooter(page, font, tenderId, pageNumber, totalPages) {
   const size = 8;
   const textWidth = font.widthOfTextAtSize(label, size);
   page.drawText(label, {
-    x: (width - textWidth) / 2,
+    x: Math.max(inset, (width - textWidth) / 2),
     y: 10,
     size,
     font,
@@ -254,7 +255,7 @@ export async function buildPackagePdf({ tender, requirements, files, matches, ex
     });
     loaded.push({
       requirement: item.requirement,
-      source,
+      bytes: item.file.bytes,
       pageCount: source.getPageCount(),
     });
   }
@@ -277,8 +278,22 @@ export async function buildPackagePdf({ tender, requirements, files, matches, ex
   drawIndex(index, font, fontBold, tender, entries);
 
   for (const item of loaded) {
-    const copied = await pdfDoc.copyPages(item.source, item.source.getPageIndices());
-    copied.forEach((copiedPage) => pdfDoc.addPage(copiedPage));
+    const indices = Array.from({ length: item.pageCount }, (_, index) => index);
+    const embeddedPages = await pdfDoc.embedPdf(item.bytes, indices);
+    for (const embedded of embeddedPages) {
+      const width = embedded.width;
+      const height = embedded.height;
+      const page = pdfDoc.addPage([width, height]);
+      const usable = Math.max(height - FOOTER_H, height * 0.9);
+      const scale = usable / height;
+      const drawWidth = width * scale;
+      page.drawPage(embedded, {
+        x: (width - drawWidth) / 2,
+        y: FOOTER_H,
+        width: drawWidth,
+        height: usable,
+      });
+    }
   }
 
   onProgress?.("finalizing");

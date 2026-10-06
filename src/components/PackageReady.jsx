@@ -35,6 +35,9 @@ export function GenerationProgress() {
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-[420px] rounded-[20px] border border-line bg-surface p-6 shadow-[0_20px_60px_rgba(28,25,23,0.18)]"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
           >
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-seal">{t(language, "appName")}</p>
             <h2 className="mt-2 text-[20px] font-bold tracking-tight text-ink">{t(language, PHASES[current].key)}</h2>
@@ -89,6 +92,7 @@ export function PackageReady() {
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-[460px] rounded-[22px] border border-line bg-surface p-6 shadow-[0_24px_70px_rgba(28,25,23,0.2)]"
             role="dialog"
+            aria-modal="true"
             aria-labelledby="package-ready-title"
           >
             <div className="flex items-start justify-between gap-3">

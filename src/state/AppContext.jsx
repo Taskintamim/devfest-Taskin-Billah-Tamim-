@@ -67,11 +67,20 @@ function reducer(state, action) {
       };
     case "ADD_FILES":
       return { ...state, files: [...state.files, ...action.files], generation: keepOrResetGeneration(state) };
-    case "UPDATE_FILE":
+    case "UPDATE_FILE": {
+      let nextMatches = state.matches;
+      if (action.patch.status === "invalid") {
+        nextMatches = { ...state.matches };
+        for (const [requirementId, fileId] of Object.entries(nextMatches)) {
+          if (fileId === action.id) delete nextMatches[requirementId];
+        }
+      }
       return {
         ...state,
         files: state.files.map((file) => (file.id === action.id ? { ...file, ...action.patch } : file)),
+        matches: nextMatches,
       };
+    }
     case "REMOVE_FILE": {
       const nextMatches = { ...state.matches };
       for (const [requirementId, fileId] of Object.entries(nextMatches)) {
@@ -279,6 +288,14 @@ export function AppProvider({ children }) {
           try {
             const buffer = await item.blob.arrayBuffer();
             const bytes = new Uint8Array(buffer);
+            if (bytes.byteLength === 0) {
+              dispatch({
+                type: "UPDATE_FILE",
+                id: item.id,
+                patch: { status: "invalid", error: "unreadable", bytes, hash: null, pageCount: null },
+              });
+              return;
+            }
             const hash = await sha256Hex(bytes);
 
             let pageCount = null;
@@ -354,7 +371,12 @@ export function AppProvider({ children }) {
         );
         return false;
       }
+      const previousReqId = Object.entries(matches).find(([reqId, id]) => id === fileId && reqId !== requirementId)?.[0];
       dispatch({ type: "SET_MATCH", requirementId, fileId });
+      if (previousReqId) {
+        const previousReq = state.requirements.find((item) => item.id === previousReqId);
+        pushToast("ok", t(lang, "matchMoved", { name: requirementTitle(previousReq, lang) || previousReqId }));
+      }
       return true;
     },
     [pushToast, state.language, state.requirements],
@@ -407,12 +429,6 @@ export function AppProvider({ children }) {
           url: downloaded.url,
         },
       });
-      window.__folioLastPackage = {
-        filename: built.filename,
-        pages: built.pages,
-        documents: built.documents,
-        url: downloaded.url,
-      };
     } catch (error) {
       const key =
         error?.message === "not-ready"

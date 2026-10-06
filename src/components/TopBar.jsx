@@ -1,8 +1,7 @@
 import { motion } from "framer-motion";
 import { FileJson } from "lucide-react";
 import { useRef } from "react";
-import { localizeNumber } from "../lib/format";
-import { t } from "../lib/i18n";
+import { t, tCount } from "../lib/i18n";
 import { useApp } from "../state/AppContext";
 import { LanguageSwitch, SealMark, StatusBadge } from "./ui";
 
@@ -17,7 +16,7 @@ function readiness(app) {
   if (validation.ready) return { label: t(language, "packageReady"), tone: "ok" };
   if (validation.blockers.length > 0) {
     return {
-      label: t(language, "issuesBlocking", { n: localizeNumber(validation.blockers.length, language) }),
+      label: tCount(language, "issuesBlocking", validation.blockers.length),
       tone: "danger",
     };
   }

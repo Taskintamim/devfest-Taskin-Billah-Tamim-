@@ -147,7 +147,9 @@ export function RequirementRow({ requirement, index }) {
                 className="mt-1 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none transition focus:border-seal"
               />
               <p className="mt-1 text-[11px] text-muted">
-                {t(language, "expiryHelper")}
+                {expiry && tender?.submission_deadline && expiry === tender.submission_deadline
+                  ? t(language, "expiryOnDeadline")
+                  : t(language, "expiryHelper")}
                 {tender?.submission_deadline ? ` · ${formatDeadline(tender.submission_deadline, language)}` : ""}
               </p>
             </div>

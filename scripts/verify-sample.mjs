@@ -70,6 +70,11 @@ if (loaded.getPageCount() !== result.pages) {
   console.error("page count mismatch");
   process.exit(1);
 }
+const predicted = 2 + result.entries.reduce((sum, item) => sum + item.pageCount, 0);
+if (predicted !== result.pages) {
+  console.error("index start pages do not match merged page count", { predicted, actual: result.pages });
+  process.exit(1);
+}
 if (result.filename !== `${tender.tender_id}_Package.pdf`) {
   console.error("bad filename");
   process.exit(1);

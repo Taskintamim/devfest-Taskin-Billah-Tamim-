@@ -1,3 +1,5 @@
+import { localizeNumber } from "./format";
+
 export const translations = {
   en: {
     appName: "Folio",
@@ -55,9 +57,9 @@ export const translations = {
     ready: "Ready",
     invalid: "Unreadable",
     duplicate: "Duplicate",
-    duplicateOf: "Same content as {name}",
-    duplicateCopies: "{n} identical files",
-    exactDuplicate: "Exact duplicate",
+    duplicateOf: "These files contain identical content ({name}).",
+    duplicateCopies: "{n} files contain identical content",
+    exactDuplicate: "Identical content",
     noFilesTitle: "No files yet",
     noFilesBody: "Upload the tender PDFs to start matching.",
     fileStats: "{files} files · {pages} pages · {size}",
@@ -72,10 +74,12 @@ export const translations = {
     packageReady: "Package ready",
     packageReadyBody: "All required documents verified.",
     issuesBlocking: "{n} issues blocking package generation",
+    issuesBlockingOne: "1 issue blocking package generation",
+    blockingSummary: "{n} issues must be resolved",
+    blockingSummaryOne: "1 issue must be resolved",
     loadTenderFirst: "Load a tender to start the package.",
     addFilesNext: "Upload the tender PDFs to start matching.",
     reviewMatches: "Match each required document, then check expiry dates.",
-    blockingSummary: "{n} issues must be resolved",
     noBlockersYet: "No blocking checks yet",
     resolveThenGenerate: "{n} issues must be resolved",
 
@@ -114,9 +118,13 @@ export const translations = {
     filterBlocking: "Needs attention",
     filterReady: "Ready",
     blockingMissing: "{n} required documents missing",
+    blockingMissingOne: "1 required document missing",
     blockingExpiry: "{n} expiry dates needed",
+    blockingExpiryOne: "1 expiry date needed",
     blockingExpired: "{n} expired",
+    blockingExpiredOne: "1 expired",
     unusedDuplicates: "{n} unused duplicate files",
+    unusedDuplicatesOne: "1 unused duplicate file",
     matchedTo: "Matched to {name}",
     generateNextStep: "All checks passed. Generate the submission package.",
     generatingPreparing: "Preparing package",
@@ -214,9 +222,9 @@ export const translations = {
     ready: "প্রস্তুত",
     invalid: "পড়া যায়নি",
     duplicate: "অনুলিপি",
-    duplicateOf: "{name}-এর মতোই বিষয়বস্তু",
-    duplicateCopies: "{n}টি অভিন্ন ফাইল",
-    exactDuplicate: "হুবহু অনুলিপি",
+    duplicateOf: "এই ফাইলগুলোর বিষয়বস্তু অভিন্ন ({name})।",
+    duplicateCopies: "{n}টি ফাইলে অভিন্ন বিষয়বস্তু",
+    exactDuplicate: "অভিন্ন বিষয়বস্তু",
     noFilesTitle: "এখনো কোনো ফাইল নেই",
     noFilesBody: "মিলানো শুরু করতে টেন্ডারের পিডিএফ আপলোড করুন।",
     fileStats: "{files}টি ফাইল · {pages} পাতা · {size}",
@@ -231,6 +239,9 @@ export const translations = {
     packageReady: "প্যাকেজ প্রস্তুত",
     packageReadyBody: "সব আবশ্যিক ডকুমেন্ট যাচাই হয়েছে।",
     issuesBlocking: "{n}টি সমস্যা প্যাকেজ তৈরি আটকে দিচ্ছে",
+    issuesBlockingOne: "১টি সমস্যা প্যাকেজ তৈরি আটকে দিচ্ছে",
+    blockingSummary: "{n}টি সমস্যা সমাধান করতে হবে",
+    blockingSummaryOne: "১টি সমস্যা সমাধান করতে হবে",
     loadTenderFirst: "প্যাকেজ শুরু করতে একটি টেন্ডার লোড করুন।",
     addFilesNext: "মিলানো শুরু করতে টেন্ডারের পিডিএফ আপলোড করুন।",
     reviewMatches: "প্রতিটি আবশ্যিক ডকুমেন্টে ফাইল মিলান, তারপর মেয়াদ দেখুন।",
@@ -273,9 +284,13 @@ export const translations = {
     filterBlocking: "নজর চায়",
     filterReady: "প্রস্তুত",
     blockingMissing: "{n}টি আবশ্যিক ডকুমেন্ট অনুপস্থিত",
+    blockingMissingOne: "১টি আবশ্যিক ডকুমেন্ট অনুপস্থিত",
     blockingExpiry: "{n}টি মেয়াদের তারিখ প্রয়োজন",
+    blockingExpiryOne: "১টি মেয়াদের তারিখ প্রয়োজন",
     blockingExpired: "{n}টি মেয়াদোত্তীর্ণ",
+    blockingExpiredOne: "১টি মেয়াদোত্তীর্ণ",
     unusedDuplicates: "{n}টি অব্যবহৃত অনুলিপি ফাইল",
+    unusedDuplicatesOne: "১টি অব্যবহৃত অনুলিপি ফাইল",
     matchedTo: "{name}-এর সাথে মিলানো",
     generateNextStep: "সব পরীক্ষা পাস হয়েছে। জমাদানের প্যাকেজ তৈরি করুন।",
     generatingPreparing: "প্যাকেজ প্রস্তুত হচ্ছে",
@@ -326,4 +341,9 @@ export function t(lang, key, vars = {}) {
     text = text.replaceAll(`{${name}}`, String(value));
   }
   return text;
+}
+
+export function tCount(lang, key, n) {
+  if (n === 1) return t(lang, `${key}One`);
+  return t(lang, key, { n: localizeNumber(n, lang) });
 }

@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Building2, CalendarDays, FileJson, Sparkles, UserRound } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { formatDeadline, localizeNumber } from "../lib/format";
-import { t } from "../lib/i18n";
+import { t, tCount } from "../lib/i18n";
 import { BLOCKING_STATUSES, STATUS } from "../lib/status";
 import { useApp } from "../state/AppContext";
 import { RequirementRow } from "./RequirementRow";
@@ -109,7 +109,7 @@ export function TenderPanel() {
                   <p className="mt-0.5 text-[12px] text-muted">
                     {t(language, "requirementCount", { n: localizeNumber(requirements.length, language) })}
                     {validation.blockers.length > 0
-                      ? ` · ${t(language, "blockingSummary", { n: localizeNumber(validation.blockers.length, language) })}`
+                      ? ` · ${tCount(language, "blockingSummary", validation.blockers.length)}`
                       : ""}
                   </p>
                 </div>

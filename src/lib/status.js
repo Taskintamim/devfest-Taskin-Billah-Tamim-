@@ -8,13 +8,19 @@ export const STATUS = {
 
 export const BLOCKING_STATUSES = new Set([STATUS.MISSING, STATUS.EXPIRY_NEEDED, STATUS.EXPIRED]);
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isUsableFile(file) {
+  return Boolean(file?.id && file.status === "ready" && file.hash && file.bytes?.byteLength);
+}
+
 export function requirementStatus(requirement, fileId, expiryDate, deadline) {
   const matched = Boolean(fileId);
   if (!matched) {
     return requirement.mandatory ? STATUS.MISSING : STATUS.NOT_PROVIDED;
   }
   if (requirement.has_expiry) {
-    if (!expiryDate) return STATUS.EXPIRY_NEEDED;
+    if (!expiryDate || !DATE_RE.test(expiryDate)) return STATUS.EXPIRY_NEEDED;
     if (expiryDate < deadline) return STATUS.EXPIRED;
   }
   return STATUS.OK;
@@ -52,7 +58,7 @@ export function evaluatePackage({ tender, requirements, files, matches, expiryDa
   for (const requirement of requirements) {
     const file = fileForMatch(files, matches, requirement.id);
     const expiry = expiryDates[requirement.id] || "";
-    const status = requirementStatus(requirement, file?.id, expiry, deadline);
+    const status = requirementStatus(requirement, isUsableFile(file) ? file.id : null, expiry, deadline);
     const blocking = BLOCKING_STATUSES.has(status);
     byRequirement[requirement.id] = {
       status,

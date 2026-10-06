@@ -87,7 +87,10 @@ export function FilePicker({ requirementId, onClose }) {
             <button
               key={file.id}
               type="button"
+              role="option"
+              aria-selected={selected}
               disabled={disabled}
+              aria-disabled={disabled}
               onClick={() => {
                 if (matchFile(requirementId, file.id)) onClose();
               }}

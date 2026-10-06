@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Download, LoaderCircle } from "lucide-react";
 import { localizeNumber, requirementTitle } from "../lib/format";
-import { t } from "../lib/i18n";
+import { t, tCount } from "../lib/i18n";
 import { useApp } from "../state/AppContext";
 
 function generatingLabel(language, phase) {
@@ -39,7 +39,7 @@ export function ActionBar() {
     title = t(language, "packageReady");
     body = t(language, "packageReadyBody");
   } else if (tender && n > 0) {
-    title = t(language, "issuesBlocking", { n: localizeNumber(n, language) });
+    title = tCount(language, "issuesBlocking", n);
     const first = validation.blockers.slice(0, 2).map((item) => requirementTitle(item.requirement, language));
     const extra = n > 2 ? ` +${localizeNumber(n - 2, language)}` : "";
     body = first.length ? `${first.join(" · ")}${extra}` : t(language, "reviewMatches");
@@ -51,7 +51,7 @@ export function ActionBar() {
   const canDownload = Boolean(success);
 
   return (
-    <footer className="sticky bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur-md">
+    <footer className="z-30 shrink-0 border-t border-line bg-surface/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:px-6">
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2 text-[13px] font-semibold text-ink">
@@ -71,11 +71,11 @@ export function ActionBar() {
             <p className="mt-1 hidden text-[11px] text-muted lg:block">
               {[
                 validation.counts.missing > 0 &&
-                  t(language, "blockingMissing", { n: localizeNumber(validation.counts.missing, language) }),
+                  tCount(language, "blockingMissing", validation.counts.missing),
                 validation.counts.expiry_needed > 0 &&
-                  t(language, "blockingExpiry", { n: localizeNumber(validation.counts.expiry_needed, language) }),
+                  tCount(language, "blockingExpiry", validation.counts.expiry_needed),
                 validation.counts.expired > 0 &&
-                  t(language, "blockingExpired", { n: localizeNumber(validation.counts.expired, language) }),
+                  tCount(language, "blockingExpired", validation.counts.expired),
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -85,7 +85,7 @@ export function ActionBar() {
 
         {unusedDups > 0 && !busy && (
           <div className="inline-flex items-center rounded-[10px] bg-dup-soft px-3 py-2 text-[12px] font-semibold text-dup">
-            {t(language, "unusedDuplicates", { n: localizeNumber(unusedDups, language) })}
+            {tCount(language, "unusedDuplicates", unusedDups)}
           </div>
         )}
 
