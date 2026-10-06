@@ -7,6 +7,21 @@ import { errorKeyForParse, parseRequirementsPayload } from "../lib/parseRequirem
 import { readPdfPageCount } from "../lib/pdf";
 import { buildSuggestions } from "../lib/suggest";
 import { evaluatePackage, matchedHashSet } from "../lib/status";
+import { buildPackagePdf, triggerDownload } from "../lib/packagePdf";
+
+const IDLE_GENERATION = {
+  phase: "idle",
+  result: null,
+  error: null,
+  overlay: false,
+};
+
+const BUSY_PHASES = new Set(["preparing", "processing", "finalizing"]);
+
+function keepOrResetGeneration(state) {
+  if (BUSY_PHASES.has(state.generation.phase)) return state.generation;
+  return IDLE_GENERATION;
+}
 
 const AppContext = createContext(null);
 
@@ -34,6 +49,7 @@ const initialState = {
   matches: {},
   expiryDates: {},
   toasts: [],
+  generation: IDLE_GENERATION,
 };
 
 function reducer(state, action) {
@@ -47,9 +63,10 @@ function reducer(state, action) {
         requirements: action.requirements,
         matches: {},
         expiryDates: {},
+        generation: IDLE_GENERATION,
       };
     case "ADD_FILES":
-      return { ...state, files: [...state.files, ...action.files] };
+      return { ...state, files: [...state.files, ...action.files], generation: keepOrResetGeneration(state) };
     case "UPDATE_FILE":
       return {
         ...state,
@@ -64,28 +81,29 @@ function reducer(state, action) {
         ...state,
         files: state.files.filter((file) => file.id !== action.id),
         matches: nextMatches,
+        generation: keepOrResetGeneration(state),
       };
     }
     case "CLEAR_FILES":
-      return { ...state, files: [], matches: {}, expiryDates: {} };
+      return { ...state, files: [], matches: {}, expiryDates: {}, generation: IDLE_GENERATION };
     case "SET_MATCH": {
       const nextMatches = { ...state.matches };
       for (const [requirementId, fileId] of Object.entries(nextMatches)) {
         if (fileId === action.fileId) delete nextMatches[requirementId];
       }
       nextMatches[action.requirementId] = action.fileId;
-      return { ...state, matches: nextMatches };
+      return { ...state, matches: nextMatches, generation: keepOrResetGeneration(state) };
     }
     case "UNMATCH": {
       const nextMatches = { ...state.matches };
       delete nextMatches[action.requirementId];
-      return { ...state, matches: nextMatches };
+      return { ...state, matches: nextMatches, generation: keepOrResetGeneration(state) };
     }
     case "SET_EXPIRY": {
       const nextExpiry = { ...state.expiryDates };
       if (action.value) nextExpiry[action.requirementId] = action.value;
       else delete nextExpiry[action.requirementId];
-      return { ...state, expiryDates: nextExpiry };
+      return { ...state, expiryDates: nextExpiry, generation: keepOrResetGeneration(state) };
     }
     case "APPLY_MATCHES": {
       const nextMatches = { ...state.matches };
@@ -95,8 +113,24 @@ function reducer(state, action) {
         }
         nextMatches[item.requirementId] = item.fileId;
       }
-      return { ...state, matches: nextMatches };
+      return { ...state, matches: nextMatches, generation: keepOrResetGeneration(state) };
     }
+    case "GEN_START":
+      return { ...state, generation: { ...IDLE_GENERATION, phase: "preparing" } };
+    case "GEN_PHASE":
+      return { ...state, generation: { ...state.generation, phase: action.phase } };
+    case "GEN_SUCCESS":
+      return {
+        ...state,
+        generation: { phase: "success", result: action.result, error: null, overlay: true },
+      };
+    case "GEN_ERROR":
+      return {
+        ...state,
+        generation: { ...state.generation, phase: "error", error: action.error, overlay: false },
+      };
+    case "GEN_DISMISS":
+      return { ...state, generation: { ...state.generation, overlay: false } };
     case "PUSH_TOAST":
       return { ...state, toasts: [...state.toasts.slice(-4), action.toast] };
     case "DISMISS_TOAST":
@@ -339,9 +373,74 @@ export function AppProvider({ children }) {
     dispatch({ type: "APPLY_MATCHES", items });
   }, []);
 
-  const requestGenerate = useCallback(() => {
-    pushToast("ok", t(state.language, "generateNextStep"));
-  }, [pushToast, state.language]);
+  const snapshotRef = useRef(state);
+  snapshotRef.current = state;
+  const generatingRef = useRef(false);
+  const lastUrlRef = useRef(null);
+
+  const requestGenerate = useCallback(async () => {
+    if (generatingRef.current) return;
+    const { language, tender, requirements, files, matches, expiryDates } = snapshotRef.current;
+    const current = evaluatePackage({ tender, requirements, files, matches, expiryDates });
+    if (!current.ready) {
+      pushToast("danger", t(language, "errorNotReady"));
+      return;
+    }
+
+    generatingRef.current = true;
+    dispatch({ type: "GEN_START" });
+    try {
+      const built = await buildPackagePdf(
+        { tender, requirements, files, matches, expiryDates },
+        (phase) => dispatch({ type: "GEN_PHASE", phase }),
+      );
+      const downloaded = triggerDownload(built.bytes, built.filename);
+      if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
+      lastUrlRef.current = downloaded.url;
+      dispatch({
+        type: "GEN_SUCCESS",
+        result: {
+          filename: built.filename,
+          pages: built.pages,
+          documents: built.documents,
+          bytes: built.bytes,
+          url: downloaded.url,
+        },
+      });
+      window.__folioLastPackage = {
+        filename: built.filename,
+        pages: built.pages,
+        documents: built.documents,
+        url: downloaded.url,
+      };
+    } catch (error) {
+      const key =
+        error?.message === "not-ready"
+          ? "errorNotReady"
+          : error?.message === "no-documents"
+            ? "errorNoDocuments"
+            : error?.message === "missing-bytes"
+              ? "errorMissingBytes"
+              : "errorGenerateGeneric";
+      const message = t(language, key);
+      dispatch({ type: "GEN_ERROR", error: message });
+      pushToast("danger", message);
+    } finally {
+      generatingRef.current = false;
+    }
+  }, [pushToast]);
+
+  const downloadPackage = useCallback(() => {
+    const result = snapshotRef.current.generation.result;
+    if (!result?.bytes || !result.filename) return;
+    const downloaded = triggerDownload(result.bytes, result.filename);
+    if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
+    lastUrlRef.current = downloaded.url;
+  }, []);
+
+  const dismissGeneration = useCallback(() => {
+    dispatch({ type: "GEN_DISMISS" });
+  }, []);
 
   const duplicates = useMemo(() => duplicateMap(state.files), [state.files]);
 
@@ -389,6 +488,8 @@ export function AppProvider({ children }) {
       setExpiry,
       applySuggestions,
       requestGenerate,
+      downloadPackage,
+      dismissGeneration,
       pushToast,
       dismissToast,
     }),
@@ -407,6 +508,8 @@ export function AppProvider({ children }) {
       setExpiry,
       applySuggestions,
       requestGenerate,
+      downloadPackage,
+      dismissGeneration,
       pushToast,
       dismissToast,
     ],

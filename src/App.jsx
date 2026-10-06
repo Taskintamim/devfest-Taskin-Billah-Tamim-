@@ -1,5 +1,6 @@
 import { ActionBar } from "./components/ActionBar";
 import { FilePanel } from "./components/FilePanel";
+import { GenerationProgress, PackageReady } from "./components/PackageReady";
 import { TenderPanel } from "./components/TenderPanel";
 import { ToastStack } from "./components/ToastStack";
 import { TopBar } from "./components/TopBar";
@@ -17,6 +18,8 @@ export default function App() {
         </main>
         <ActionBar />
         <ToastStack />
+        <GenerationProgress />
+        <PackageReady />
       </div>
     </div>
   );

@@ -7,7 +7,12 @@ import { useApp } from "../state/AppContext";
 import { LanguageSwitch, SealMark, StatusBadge } from "./ui";
 
 function readiness(app) {
-  const { language, tender, validation } = app;
+  const { language, tender, validation, generation } = app;
+  if (generation.phase === "success") return { label: t(language, "packageReadyHeadline"), tone: "ok" };
+  if (["preparing", "processing", "finalizing"].includes(generation.phase)) {
+    return { label: t(language, "generatingProcessing"), tone: "seal" };
+  }
+  if (generation.phase === "error") return { label: t(language, "generationFailed"), tone: "danger" };
   if (!tender) return { label: t(language, "awaitingTender"), tone: "muted" };
   if (validation.ready) return { label: t(language, "packageReady"), tone: "ok" };
   if (validation.blockers.length > 0) {
