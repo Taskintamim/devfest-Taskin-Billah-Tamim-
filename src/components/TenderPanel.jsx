@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Building2, CalendarDays, FileJson, UserRound } from "lucide-react";
-import { useRef } from "react";
-import { formatDeadline, localizeNumber, padOrder, requirementTitle } from "../lib/format";
+import { Building2, CalendarDays, FileJson, Sparkles, UserRound } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { formatDeadline, localizeNumber } from "../lib/format";
 import { t } from "../lib/i18n";
+import { BLOCKING_STATUSES, STATUS } from "../lib/status";
 import { useApp } from "../state/AppContext";
-import { StatusBadge } from "./ui";
+import { RequirementRow } from "./RequirementRow";
 
 function MetaCell({ icon: Icon, label, value }) {
   return (
@@ -19,8 +20,28 @@ function MetaCell({ icon: Icon, label, value }) {
 }
 
 export function TenderPanel() {
-  const { language, tender, requirements, loadRequirementsFile } = useApp();
+  const { language, tender, requirements, loadRequirementsFile, validation, suggestions, applySuggestions, files } = useApp();
   const inputRef = useRef(null);
+  const [filter, setFilter] = useState("all");
+
+  const visible = useMemo(() => {
+    if (filter === "blocking") {
+      return requirements.filter((requirement) => BLOCKING_STATUSES.has(validation.byRequirement[requirement.id]?.status));
+    }
+    if (filter === "ready") {
+      return requirements.filter((requirement) => {
+        const status = validation.byRequirement[requirement.id]?.status;
+        return status === STATUS.OK || status === STATUS.NOT_PROVIDED;
+      });
+    }
+    return requirements;
+  }, [filter, requirements, validation]);
+
+  const filters = [
+    { id: "all", label: t(language, "filterAll") },
+    { id: "blocking", label: t(language, "filterBlocking") },
+    { id: "ready", label: t(language, "filterReady") },
+  ];
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
@@ -82,39 +103,57 @@ export function TenderPanel() {
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-line bg-surface">
-              <div className="flex items-center justify-between border-b border-line px-5 py-3">
-                <h3 className="text-[14px] font-semibold text-ink">{t(language, "documentSchedule")}</h3>
-                <span className="text-[12px] font-medium text-muted">
-                  {t(language, "requirementCount", { n: localizeNumber(requirements.length, language) })}
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
+                <div>
+                  <h3 className="text-[14px] font-semibold text-ink">{t(language, "documentSchedule")}</h3>
+                  <p className="mt-0.5 text-[12px] text-muted">
+                    {t(language, "requirementCount", { n: localizeNumber(requirements.length, language) })}
+                    {validation.blockers.length > 0
+                      ? ` · ${t(language, "blockingSummary", { n: localizeNumber(validation.blockers.length, language) })}`
+                      : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {suggestions.length > 0 && files.length > 0 && (
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => applySuggestions(suggestions)}
+                      className="inline-flex items-center gap-1.5 rounded-[10px] bg-seal-soft px-3 py-1.5 text-[12px] font-semibold text-seal-dark"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      {t(language, "applySuggestions", { n: localizeNumber(suggestions.length, language) })}
+                    </motion.button>
+                  )}
+                  <div className="relative flex rounded-[10px] bg-paper-2 p-0.5 ring-1 ring-line">
+                    {filters.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setFilter(item.id)}
+                        className={`relative z-10 rounded-[8px] px-2.5 py-1 text-[11px] font-semibold ${
+                          filter === item.id ? "text-white" : "text-ink-soft"
+                        }`}
+                      >
+                        {filter === item.id && (
+                          <motion.span
+                            layoutId="req-filter"
+                            className="absolute inset-0 -z-10 rounded-[8px] bg-ink"
+                            transition={{ type: "spring", stiffness: 480, damping: 36 }}
+                          />
+                        )}
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <ol className="scrollbar-thin min-h-0 flex-1 overflow-auto">
-                {requirements.map((requirement, index) => (
-                  <motion.li
-                    key={requirement.id}
-                    layout
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(index * 0.03, 0.24), duration: 0.22 }}
-                    className="flex flex-wrap items-start gap-x-4 gap-y-2 border-b border-line/70 px-5 py-3.5 last:border-b-0 sm:items-center"
-                  >
-                    <span className="tabular w-8 shrink-0 pt-0.5 text-[13px] font-bold text-muted sm:pt-0">
-                      {localizeNumber(padOrder(requirement.order), language)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-semibold text-ink">{requirementTitle(requirement, language)}</p>
-                      <p className="mt-0.5 text-[11px] text-muted">{requirement.id}</p>
-                    </div>
-                    <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
-                      <StatusBadge tone={requirement.mandatory ? "danger" : "muted"}>
-                        {t(language, requirement.mandatory ? "mandatory" : "optional")}
-                      </StatusBadge>
-                      <StatusBadge tone={requirement.has_expiry ? "warn" : "muted"}>
-                        {t(language, requirement.has_expiry ? "expiryRequired" : "noExpiry")}
-                      </StatusBadge>
-                    </div>
-                  </motion.li>
-                ))}
+                <AnimatePresence initial={false}>
+                  {visible.map((requirement, index) => (
+                    <RequirementRow key={requirement.id} requirement={requirement} index={index} />
+                  ))}
+                </AnimatePresence>
               </ol>
             </div>
           </motion.div>

@@ -7,8 +7,8 @@ import { WorkflowStrip } from "./components/WorkflowStrip";
 
 export default function App() {
   return (
-    <div className="paper-grid min-h-screen text-ink">
-      <div className="flex min-h-screen flex-col bg-paper/80">
+    <div className="paper-grid h-dvh overflow-hidden text-ink">
+      <div className="flex h-dvh flex-col bg-paper/80">
         <TopBar />
         <WorkflowStrip />
         <main className="mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col lg:flex-row">

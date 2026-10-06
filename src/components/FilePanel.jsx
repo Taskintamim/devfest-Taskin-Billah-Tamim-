@@ -1,12 +1,12 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Copy, FileText, LoaderCircle, Trash2, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { formatBytes, localizeNumber } from "../lib/format";
+import { formatBytes, localizeNumber, requirementTitle } from "../lib/format";
 import { t } from "../lib/i18n";
 import { useApp } from "../state/AppContext";
 import { StatusBadge } from "./ui";
 
-function FileCard({ file, duplicate, language, onRemove }) {
+function FileCard({ file, duplicate, language, onRemove, matchedRequirement, selected }) {
   const pages = file.pageCount;
   const pageLabel =
     pages == null
@@ -18,9 +18,11 @@ function FileCard({ file, duplicate, language, onRemove }) {
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6, height: 0 }}
+      exit={{ opacity: 0, y: -6 }}
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-      className="rounded-[14px] border border-line bg-surface p-3.5"
+      className={`rounded-[14px] border bg-surface p-3.5 ${
+        selected ? "border-seal ring-1 ring-seal/30" : "border-line"
+      }`}
     >
       <div className="flex items-start gap-3">
         <div
@@ -49,7 +51,10 @@ function FileCard({ file, duplicate, language, onRemove }) {
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {file.status === "processing" && <StatusBadge tone="seal">{t(language, "processing")}</StatusBadge>}
-            {file.status === "ready" && !duplicate && <StatusBadge tone="ok">{t(language, "ready")}</StatusBadge>}
+            {file.status === "ready" && !duplicate && !matchedRequirement && (
+              <StatusBadge tone="muted">{t(language, "unmatched")}</StatusBadge>
+            )}
+            {matchedRequirement && <StatusBadge tone="ok">{t(language, "matched")}</StatusBadge>}
             {file.status === "invalid" && <StatusBadge tone="danger">{t(language, "invalid")}</StatusBadge>}
             {duplicate && (
               <StatusBadge tone="dup">
@@ -58,6 +63,11 @@ function FileCard({ file, duplicate, language, onRemove }) {
               </StatusBadge>
             )}
           </div>
+          {matchedRequirement && (
+            <p className="mt-2 text-[12px] leading-5 text-seal-dark">
+              {t(language, "matchedTo", { name: matchedRequirement })}
+            </p>
+          )}
           {file.status === "invalid" && (
             <p className="mt-2 text-[12px] leading-5 text-danger">{t(language, "errorUnreadablePdf")}</p>
           )}
@@ -84,9 +94,18 @@ function FileCard({ file, duplicate, language, onRemove }) {
 }
 
 export function FilePanel() {
-  const { language, files, duplicates, addFiles, removeFile, clearFiles } = useApp();
+  const { language, files, duplicates, addFiles, removeFile, clearFiles, matches, requirements } = useApp();
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
+
+  const matchedByFile = useMemo(() => {
+    const map = {};
+    for (const [requirementId, fileId] of Object.entries(matches)) {
+      const requirement = requirements.find((item) => item.id === requirementId);
+      if (requirement) map[fileId] = requirementTitle(requirement, language);
+    }
+    return map;
+  }, [matches, requirements, language]);
 
   const stats = useMemo(() => {
     const pages = files.reduce((sum, file) => sum + (file.pageCount || 0), 0);
@@ -200,6 +219,8 @@ export function FilePanel() {
                   duplicate={duplicates[file.id]}
                   language={language}
                   onRemove={removeFile}
+                  matchedRequirement={matchedByFile[file.id]}
+                  selected={Boolean(matchedByFile[file.id])}
                 />
               ))}
             </ul>

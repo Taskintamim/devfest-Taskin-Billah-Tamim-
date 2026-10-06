@@ -1,28 +1,22 @@
 import { motion } from "framer-motion";
 import { FileJson } from "lucide-react";
 import { useRef } from "react";
+import { localizeNumber } from "../lib/format";
 import { t } from "../lib/i18n";
 import { useApp } from "../state/AppContext";
 import { LanguageSwitch, SealMark, StatusBadge } from "./ui";
 
 function readiness(app) {
-  const { language, tender, files, duplicates } = app;
-  const invalid = files.filter((file) => file.status === "invalid").length;
-  const dupCount = Object.keys(duplicates).length;
-
-  if (!tender) {
-    return { label: t(language, "awaitingTender"), tone: "muted" };
+  const { language, tender, validation } = app;
+  if (!tender) return { label: t(language, "awaitingTender"), tone: "muted" };
+  if (validation.ready) return { label: t(language, "packageReady"), tone: "ok" };
+  if (validation.blockers.length > 0) {
+    return {
+      label: t(language, "issuesBlocking", { n: localizeNumber(validation.blockers.length, language) }),
+      tone: "danger",
+    };
   }
-  if (files.length === 0) {
-    return { label: t(language, "awaitingFiles"), tone: "seal" };
-  }
-  if (invalid > 0) {
-    return { label: t(language, "filesInvalid"), tone: "danger" };
-  }
-  if (dupCount > 0) {
-    return { label: t(language, "duplicatesFound"), tone: "dup" };
-  }
-  return { label: t(language, "filesReceived"), tone: "ok" };
+  return { label: t(language, "awaitingFiles"), tone: "seal" };
 }
 
 export function TopBar() {

@@ -2,8 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { LANGUAGE_KEY, MAX_FILES, MAX_TOTAL_BYTES } from "../lib/constants";
 import { duplicateMap, sha256Hex } from "../lib/hash";
 import { t } from "../lib/i18n";
+import { requirementTitle } from "../lib/format";
 import { errorKeyForParse, parseRequirementsPayload } from "../lib/parseRequirements";
 import { readPdfPageCount } from "../lib/pdf";
+import { buildSuggestions } from "../lib/suggest";
+import { evaluatePackage, matchedHashSet } from "../lib/status";
 
 const AppContext = createContext(null);
 
@@ -65,6 +68,35 @@ function reducer(state, action) {
     }
     case "CLEAR_FILES":
       return { ...state, files: [], matches: {}, expiryDates: {} };
+    case "SET_MATCH": {
+      const nextMatches = { ...state.matches };
+      for (const [requirementId, fileId] of Object.entries(nextMatches)) {
+        if (fileId === action.fileId) delete nextMatches[requirementId];
+      }
+      nextMatches[action.requirementId] = action.fileId;
+      return { ...state, matches: nextMatches };
+    }
+    case "UNMATCH": {
+      const nextMatches = { ...state.matches };
+      delete nextMatches[action.requirementId];
+      return { ...state, matches: nextMatches };
+    }
+    case "SET_EXPIRY": {
+      const nextExpiry = { ...state.expiryDates };
+      if (action.value) nextExpiry[action.requirementId] = action.value;
+      else delete nextExpiry[action.requirementId];
+      return { ...state, expiryDates: nextExpiry };
+    }
+    case "APPLY_MATCHES": {
+      const nextMatches = { ...state.matches };
+      for (const item of action.items) {
+        for (const [requirementId, fileId] of Object.entries(nextMatches)) {
+          if (fileId === item.fileId) delete nextMatches[requirementId];
+        }
+        nextMatches[item.requirementId] = item.fileId;
+      }
+      return { ...state, matches: nextMatches };
+    }
     case "PUSH_TOAST":
       return { ...state, toasts: [...state.toasts.slice(-4), action.toast] };
     case "DISMISS_TOAST":
@@ -83,6 +115,8 @@ export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const filesRef = useRef(state.files);
   filesRef.current = state.files;
+  const matchesRef = useRef(state.matches);
+  matchesRef.current = state.matches;
 
   useEffect(() => {
     document.documentElement.lang = state.language;
@@ -259,21 +293,123 @@ export function AppProvider({ children }) {
     dispatch({ type: "CLEAR_FILES" });
   }, []);
 
+  const matchFile = useCallback(
+    (requirementId, fileId) => {
+      const lang = state.language;
+      const files = filesRef.current;
+      const matches = matchesRef.current;
+      const file = files.find((item) => item.id === fileId);
+      if (!file || file.status !== "ready" || !file.hash) {
+        pushToast("danger", t(lang, "errorFileNotUsable"));
+        return false;
+      }
+      const blockedHashes = matchedHashSet(files, matches, requirementId);
+      if (blockedHashes.has(file.hash)) {
+        const ownerId = Object.entries(matches).find(([, id]) => {
+          const owner = files.find((item) => item.id === id);
+          return owner?.hash === file.hash;
+        })?.[0];
+        const ownerFile = files.find((item) => item.id === matches[ownerId]);
+        const ownerReq = state.requirements.find((item) => item.id === ownerId);
+        pushToast(
+          "danger",
+          t(lang, "errorDuplicateMatch", {
+            file: ownerFile?.name || file.name,
+            doc: requirementTitle(ownerReq, lang) || ownerId,
+          }),
+        );
+        return false;
+      }
+      dispatch({ type: "SET_MATCH", requirementId, fileId });
+      return true;
+    },
+    [pushToast, state.language, state.requirements],
+  );
+
+  const unmatchFile = useCallback((requirementId) => {
+    dispatch({ type: "UNMATCH", requirementId });
+  }, []);
+
+  const setExpiry = useCallback((requirementId, value) => {
+    dispatch({ type: "SET_EXPIRY", requirementId, value });
+  }, []);
+
+  const applySuggestions = useCallback((items) => {
+    if (!items?.length) return;
+    dispatch({ type: "APPLY_MATCHES", items });
+  }, []);
+
+  const requestGenerate = useCallback(() => {
+    pushToast("ok", t(state.language, "generateNextStep"));
+  }, [pushToast, state.language]);
+
   const duplicates = useMemo(() => duplicateMap(state.files), [state.files]);
+
+  const validation = useMemo(
+    () =>
+      evaluatePackage({
+        tender: state.tender,
+        requirements: state.requirements,
+        files: state.files,
+        matches: state.matches,
+        expiryDates: state.expiryDates,
+      }),
+    [state.tender, state.requirements, state.files, state.matches, state.expiryDates],
+  );
+
+  const hashBlockSet = useMemo(
+    () => matchedHashSet(state.files, state.matches, null),
+    [state.files, state.matches],
+  );
+
+  const suggestions = useMemo(
+    () =>
+      buildSuggestions({
+        files: state.files,
+        requirements: state.requirements,
+        matches: state.matches,
+        matchedHashes: hashBlockSet,
+      }),
+    [state.files, state.requirements, state.matches, hashBlockSet],
+  );
 
   const value = useMemo(
     () => ({
       ...state,
       duplicates,
+      validation,
+      suggestions,
       setLanguage,
       loadRequirementsFile,
       addFiles,
       removeFile,
       clearFiles,
+      matchFile,
+      unmatchFile,
+      setExpiry,
+      applySuggestions,
+      requestGenerate,
       pushToast,
       dismissToast,
     }),
-    [state, duplicates, setLanguage, loadRequirementsFile, addFiles, removeFile, clearFiles, pushToast, dismissToast],
+    [
+      state,
+      duplicates,
+      validation,
+      suggestions,
+      setLanguage,
+      loadRequirementsFile,
+      addFiles,
+      removeFile,
+      clearFiles,
+      matchFile,
+      unmatchFile,
+      setExpiry,
+      applySuggestions,
+      requestGenerate,
+      pushToast,
+      dismissToast,
+    ],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
